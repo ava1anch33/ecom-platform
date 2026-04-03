@@ -1,0 +1,129 @@
+-- 1. create db
+CREATE DATABASE IF NOT EXISTS comp7640_ecommerce
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_general_ci;
+
+USE comp7640_ecommerce;
+
+-- 2. delete old table for convenient test
+DROP TABLE IF EXISTS transactions;
+DROP TABLE IF EXISTS order_items;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS customers;
+DROP TABLE IF EXISTS vendors;
+
+-- =============================================
+-- 3. create table
+-- =============================================
+
+-- Vendors
+CREATE TABLE vendors (
+    vendor_id              INT AUTO_INCREMENT PRIMARY KEY,
+    business_name          VARCHAR(100) NOT NULL UNIQUE,
+    average_rating         DECIMAL(3,2) DEFAULT 5.00 CHECK (average_rating BETWEEN 0 AND 5),
+    geographical_presence  VARCHAR(100) NOT NULL,
+    created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- Products
+CREATE TABLE products (
+    product_id      INT AUTO_INCREMENT PRIMARY KEY,
+    vendor_id       INT NOT NULL,
+    name            VARCHAR(100) NOT NULL,
+    listed_price    DECIMAL(10,2) NOT NULL CHECK (listed_price > 0),
+    stock_quantity  INT NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0),
+    tag1            VARCHAR(50),
+    tag2            VARCHAR(50),
+    tag3            VARCHAR(50),
+    FOREIGN KEY (vendor_id) REFERENCES vendors(vendor_id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Customers
+CREATE TABLE customers (
+    customer_id     INT AUTO_INCREMENT PRIMARY KEY,
+    first_number    VARCHAR(20) NOT NULL,
+    contact_number  VARCHAR(20) NOT NULL,
+    shipping_address VARCHAR(255) NOT NULL
+) ENGINE=InnoDB;
+
+-- Orders
+CREATE TABLE orders (
+    order_id     INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id  INT NOT NULL,
+    order_date   DATETIME DEFAULT CURRENT_TIMESTAMP,
+    total_price  DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (total_price >= 0),
+    status       ENUM('PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED')
+                 DEFAULT 'PENDING',
+    FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+        ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+-- Order_Items
+CREATE TABLE order_items (
+    order_item_id     INT AUTO_INCREMENT PRIMARY KEY,
+    order_id          INT NOT NULL,
+    product_id        INT NOT NULL,
+    quantity          INT NOT NULL CHECK (quantity > 0),
+    price_at_purchase DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES orders(order_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(product_id)
+        ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+-- Transactions
+CREATE TABLE transactions (
+    transaction_id   INT AUTO_INCREMENT PRIMARY KEY,
+    order_id         INT NOT NULL,
+    vendor_id        INT NOT NULL,
+    amount           DECIMAL(10,2) NOT NULL CHECK (amount > 0),
+    transaction_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(order_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (vendor_id) REFERENCES vendors(vendor_id)
+        ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+-- =============================================
+-- 4. insert sample data
+-- =============================================
+
+-- Vendors
+INSERT INTO vendors (business_name, average_rating, geographical_presence) VALUES
+('Apple', 4.80, 'America'),
+('BYD', 4.50, 'China'),
+('SONY', 4.90, 'Japan');
+
+-- Products
+INSERT INTO products (vendor_id, name, listed_price, stock_quantity, tag1, tag2, tag3) VALUES
+(1, 'IPhone 17 Pro', 9999.00, 9000, 'electronics', 'phone', 'wireless'),
+(1, 'IWatch Ultra', 6799.00, 8000, 'electronics', 'wearable', 'fitness'),
+(2, 'QING', 79999.00, 10000, 'electronics', 'car', 'domestic'),
+(2, 'HAN', 200000.00, 10000, 'electronics', 'car', 'domestic'),
+(3, 'alpha 3', 50000.00, 10000, 'electronics', 'camera', 'kitchen'),
+(3, 'Stainless Steel Kettle', 199.00, 60, 'electronics', 'camera', 'appliance');
+
+-- Customers
+INSERT INTO customers (first_name, contact_number, shipping_address) VALUES
+('g19Custom1', '852-98765432', 'HONG KONG Baptist University NTT 503'),
+('g19Custom2', '852-12345678', 'HONG KONG Baptist University NTT 432');
+
+-- Orders
+INSERT INTO orders (customer_id, total_price, status) VALUES
+(1, 16798.00, 'PENDING'),
+(2, 56799.00,  'PENDING');
+
+-- Order Items
+INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase) VALUES
+(1, 1, 1, 9999.00),
+(1, 2, 1, 6799.00),
+(2, 2, 1, 6799.00),
+(2, 5, 1, 50000.00);
+
+-- Transactions
+INSERT INTO transactions (order_id, vendor_id, amount) VALUES
+(1, 1, 16798.00),
+(2, 1, 6799.00),
+(2, 3, 50000.00);
