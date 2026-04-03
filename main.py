@@ -7,4 +7,4 @@ if __name__ == "__main__":
     finally:
         from config.database import Database
         Database.close()
-        print("\n程序已安全退出。")
+        print("\nprogram exited, database connection closed.")
