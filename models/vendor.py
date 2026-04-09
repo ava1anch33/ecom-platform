@@ -11,6 +11,7 @@ class Vendor:
     average_rating: float = 5.0
     geographical_presence: str = ''
     created_at: datetime = field(default_factory=datetime.now)
+    total_inventory: Optional[int] = None
 
     def __post_init__(self):
         if not self.business_name:
