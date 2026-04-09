@@ -10,7 +10,7 @@ class Database:
             cls._connection = pymysql.connect(
                 host='localhost',
                 user='root',
-                password='764019',   # change to your MySQL password
+                password='',   # change to your MySQL password
                 database='comp7640_ecommerce',
                 charset='utf8mb4',
                 cursorclass=DictCursor,

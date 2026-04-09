@@ -43,7 +43,7 @@ CREATE TABLE products (
 -- Customers
 CREATE TABLE customers (
     customer_id     INT AUTO_INCREMENT PRIMARY KEY,
-    first_number    VARCHAR(20) NOT NULL,
+    first_name    VARCHAR(20) NOT NULL,
     contact_number  VARCHAR(20) NOT NULL,
     shipping_address VARCHAR(255) NOT NULL
 ) ENGINE=InnoDB;

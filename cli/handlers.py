@@ -99,30 +99,52 @@ def purchase_product():
     product_id = int(input("请选择要购买的商品 ID: "))
     quantity = int(input("购买数量: "))
     
-    # 创建订单
-    order = Order(customer_id=customer_id, total_price=0.0)
-    order_id = OrderRepository().create_order(order)
-    
-    # 获取商品价格
+    # 获取商品
     product_repo = ProductRepository()
-    # 这里简化：实际应查询单个商品，这里假设从前面列表中找（生产环境需加 get_by_id）
     product = next((p for p in all_products if p.product_id == product_id), None)
     if not product:
-        print("商品不存在")
+        print("❌ 商品不存在")
+        return
+    if quantity <= 0:
+        print("❌ 购买数量必须大于0")
+        return
+    if product.stock_quantity < quantity:
+        print("❌ 库存不足 无法完成购买")
         return
     
-    item = OrderItem(order_id=order_id, product_id=product_id, 
-                     quantity=quantity, price_at_purchase=product.listed_price)
+    #先算总价,再创建订单
+    total_price = product.listed_price * quantity
+    order = Order(customer_id=customer_id, total_price=total_price)
+    order_id = OrderRepository().create_order(order)
+
+    #创建订单明细
+    item = OrderItem(
+    order_id=order_id,
+    product_id=product_id,
+    quantity=quantity,
+    price_at_purchase=product.listed_price
+    )
     OrderRepository().add_order_item(item)
-    
-    # 创建交易（假设一个商户）
-    transaction = Transaction(order_id=order_id, vendor_id=product.vendor_id, 
-                              amount=product.listed_price * quantity)
+
+    #创建交易
+    transaction = Transaction(
+    order_id=order_id,
+    vendor_id=product.vendor_id,
+    amount=total_price
+    )
     TransactionRepository().create(transaction)
-    
-    # 更新订单总价
+
+    #更新库存
+    new_stock = product.stock_quantity - quantity
+    product_repo.update_stock(product_id, new_stock)
+
     print(f"✅ 购买成功！订单 ID = {order_id}")
-    print("订单已创建，可在「查看我的订单并修改」中查看。")
+    print(f"订单总价: {total_price}")
+    print(f"剩余库存: {new_stock}")
+
+
+
+    
 
 
 # ==================== Order Modification ====================

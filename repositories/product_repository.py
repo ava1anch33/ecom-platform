@@ -45,3 +45,15 @@ class ProductRepository:
             """, (f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", f"%{keyword}%"))
             rows = cursor.fetchall()
             return [Product(**row) for row in rows]
+    
+    def update_stock(self, product_id: int, new_quantity: int):
+        """Update stock quantity after purchase"""
+        conn = Database.get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE products 
+                SET stock_quantity = %s 
+                WHERE product_id = %s
+            """, (new_quantity, product_id))
+            conn.commit()
+        
