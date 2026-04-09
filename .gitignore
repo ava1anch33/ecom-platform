@@ -1,0 +1,12 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# environment
+.env
+
+# VS Code
+.vscode/
