@@ -3,6 +3,7 @@ from repositories.product_repository import ProductRepository
 from repositories.customer_repository import CustomerRepository
 from repositories.order_repository import OrderRepository
 from repositories.transaction_repository import TransactionRepository
+from services.product_service import ProductService
 from models.vendor import Vendor
 from models.product import Product
 from models.customer import Customer
@@ -79,64 +80,34 @@ def search_products_by_tag():
 
 # ==================== Product Purchase ====================
 def purchase_product():
-    # 简单演示：先选客户（实际项目可固定一个测试客户或新增）
     customers = CustomerRepository().get_all()
     if not customers:
         print("请先添加客户（当前无客户）")
         return
-    print(tabulate([[c.customer_id, c.contact_number, c.shipping_address] 
+    print(tabulate([[c.customer_id, c.contact_number, c.shipping_address]
                     for c in customers], headers=["客户ID", "电话", "地址"], tablefmt="grid"))
-    
+
     customer_id = int(input("\n请选择客户 ID: "))
-    # 显示所有商品供选择
+
     all_products = []
     for v in VendorRepository().get_all():
         all_products.extend(ProductRepository().get_by_vendor(v.vendor_id))
-    
-    print(tabulate([[p.product_id, p.name, p.listed_price, p.stock_quantity] 
+
+    print(tabulate([[p.product_id, p.name, p.listed_price, p.stock_quantity]
                     for p in all_products], headers=["ID", "名称", "价格", "库存"], tablefmt="grid"))
-    
+
     product_id = int(input("请选择要购买的商品 ID: "))
     quantity = int(input("购买数量: "))
-    
-    # 获取商品
-    product_repo = ProductRepository()
-    product = next((p for p in all_products if p.product_id == product_id), None)
-    if not product:
-        print("❌ 商品不存在")
-        return
-    if quantity <= 0:
-        print("❌ 购买数量必须大于0")
-        return
-    if product.stock_quantity < quantity:
-        print("❌ 库存不足 无法完成购买")
-        return
-    
-    #先算总价,再创建订单
-    total_price = product.listed_price * quantity
-    order = Order(customer_id=customer_id, total_price=total_price)
-    order_id = OrderRepository().create_order(order)
 
-    #创建订单明细
-    item = OrderItem(
-    order_id=order_id,
-    product_id=product_id,
-    quantity=quantity,
-    price_at_purchase=product.listed_price
-    )
-    OrderRepository().add_order_item(item)
-
-    #创建交易
-    transaction = Transaction(
-    order_id=order_id,
-    vendor_id=product.vendor_id,
-    amount=total_price
-    )
-    TransactionRepository().create(transaction)
-
-    #更新库存
-    new_stock = product.stock_quantity - quantity
-    product_repo.update_stock(product_id, new_stock)
+    try:
+        order_id, total_price, new_stock = ProductService().purchase_product(
+            customer_id=customer_id,
+            product_id=product_id,
+            quantity=quantity,
+        )
+    except ValueError as e:
+        print(f"❌ {e}")
+        return
 
     print(f"✅ 购买成功！订单 ID = {order_id}")
     print(f"订单总价: {total_price}")

@@ -46,6 +46,19 @@ class ProductRepository:
             rows = cursor.fetchall()
             return [Product(**row) for row in rows]
     
+    def get_by_id(self, product_id: int) -> Product | None:
+        """get one product by product_id"""
+        conn = Database.get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT * FROM products
+                WHERE product_id = %s
+            """, (product_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return Product(**row)
+
     def update_stock(self, product_id: int, new_quantity: int):
         """Update stock quantity after purchase"""
         conn = Database.get_connection()
