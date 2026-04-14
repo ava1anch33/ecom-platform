@@ -1,47 +1,24 @@
-from models.vendor import Vendor
-from config.database import Database
+from .base_repository import BaseRepository
 
+class VendorRepository(BaseRepository):
+  def list_all_vendors(self):
+    sql = "SELECT * FROM vendors"
+    with self._get_connection() as conn:
+      with conn.cursor() as cursor:
+        cursor.execute(sql)
+        return cursor.fetchall()
 
-class VendorRepository:
-    """vendor db operations"""
-
-    def get_all(self) -> list[Vendor]:
-        """1. show all vendors (includes aggregate product stock per vendor)"""
-        conn = Database.get_connection()
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT
-                    v.vendor_id,
-                    v.business_name,
-                    v.average_rating,
-                    v.geographical_presence,
-                    v.created_at,
-                    COALESCE(SUM(p.stock_quantity), 0) AS total_inventory
-                FROM vendors v
-                LEFT JOIN products p ON p.vendor_id = v.vendor_id
-                GROUP BY
-                    v.vendor_id,
-                    v.business_name,
-                    v.average_rating,
-                    v.geographical_presence,
-                    v.created_at
-                ORDER BY v.business_name
-            """)
-            rows = cursor.fetchall()
-            out: list[Vendor] = []
-            for row in rows:
-                r = dict(row)
-                r["total_inventory"] = int(r["total_inventory"])
-                out.append(Vendor(**r))
-            return out
-
-    def create(self, vendor: Vendor) -> int:
-        """2. Onboard new vendor"""
-        conn = Database.get_connection()
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO vendors (business_name, average_rating, geographical_presence)
-                VALUES (%s, %s, %s)
-            """, (vendor.business_name, vendor.average_rating, vendor.geographical_presence))
-            conn.commit()
-            return cursor.lastrowid
+  def onboard_new_vendor(self, business_name, geographical_presence):
+    sql = """
+      INSERT INTO vendors (business_name, geographical_presence)
+      VALUES (%s, %s)
+    """
+    with self._get_connection() as conn:
+      with conn.cursor() as cursor:
+        try:
+          cursor.execute(sql, (business_name, geographical_presence))
+          conn.commit()
+          return cursor.lastrowid
+        except Exception as e:
+          print(f"Error onboarding vendor: {e}")
+          return None

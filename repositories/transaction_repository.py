@@ -1,29 +1,17 @@
-import pymysql
-from models.transaction import Transaction
-from config.database import Database
+from .base_repository import BaseRepository
 
+class TransactionRepository(BaseRepository):
+  def get_transactions_by_order(self, order_id):
+    sql = "SELECT * FROM transactions WHERE order_id = %s"
+    with self._get_connection() as conn:
+      with conn.cursor() as cursor:
+        cursor.execute(sql, (order_id,))
+        return cursor.fetchall()
 
-class TransactionRepository:
-    """transaction db operations"""
-
-    def create(self, transaction: Transaction) -> int:
-        """create new transaction record"""
-        conn = Database.get_connection()
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO transactions (order_id, vendor_id, amount)
-                VALUES (%s, %s, %s)
-            """, (transaction.order_id, transaction.vendor_id, transaction.amount))
-            conn.commit()
-            return cursor.lastrowid
-
-    def get_by_order(self, order_id: int) -> list[Transaction]:
-        """get all transactions related to an order (for order history and refunds)"""
-        conn = Database.get_connection()
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT * FROM transactions 
-                WHERE order_id = %s
-            """, (order_id,))
-            rows = cursor.fetchall()
-            return [Transaction(**row) for row in rows]
+  def get_vendor_earnings(self, vendor_id):
+    sql = "SELECT SUM(amount) as total_earnings FROM transactions WHERE vendor_id = %s"
+    with self._get_connection() as conn:
+      with conn.cursor() as cursor:
+        cursor.execute(sql, (vendor_id,))
+        result = cursor.fetchone()
+        return result['total_earnings'] if result['total_earnings'] else 0

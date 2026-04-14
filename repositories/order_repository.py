@@ -1,65 +1,68 @@
-import pymysql
-from models.order import Order, OrderStatus
-from models.order_item import OrderItem
-from config.database import Database
+from .base_repository import BaseRepository
 
-
-class OrderRepository:
-    """order db operations"""
-
-    def create_order(self, order: Order) -> int:
-        """create new order"""
-        conn = Database.get_connection()
+class OrderRepository(BaseRepository):
+  def create_order_with_transaction(self, customer_id, items, vendor_amounts):
+    with self._get_connection() as conn:
+      conn.begin()
+      try:
         with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO orders (customer_id, total_price, status)
-                VALUES (%s, %s, %s)
-            """, (order.customer_id, order.total_price, order.status.value))
-            order_id = cursor.lastrowid
-            conn.commit()
-            return order_id
+          total_price = sum(amt for amt in vendor_amounts.values())
+          cursor.execute(
+            "INSERT INTO orders (customer_id, total_price, status) VALUES (%s, %s, 'PENDING')",
+            (customer_id, total_price)
+          )
+          order_id = conn.insert_id()
 
-    def get_by_customer(self, customer_id: int) -> list[Order]:
-        """get all orders of a customer, sorted by order_date desc"""
-        conn = Database.get_connection()
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT * FROM orders 
-                WHERE customer_id = %s 
-                ORDER BY order_date DESC
-            """, (customer_id,))
-            rows = cursor.fetchall()
-            return [Order(**row) for row in rows]
+          for p_id, qty, price in items:
+            cursor.execute(
+              "INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase) VALUES (%s, %s, %s, %s)",
+              (order_id, p_id, qty, price)
+            )
+            cursor.execute("UPDATE products SET stock_quantity = stock_quantity - %s WHERE product_id = %s", (qty, p_id))
 
-    def update_status(self, order_id: int, status: OrderStatus):
-        """update order status (Order Fulfillment)"""
-        conn = Database.get_connection()
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                UPDATE orders 
-                SET status = %s 
-                WHERE order_id = %s AND status = 'PENDING'
-            """, (status.value, order_id))
-            conn.commit()
+          for v_id, amount in vendor_amounts.items():
+            cursor.execute(
+              "INSERT INTO transactions (order_id, vendor_id, amount) VALUES (%s, %s, %s)",
+              (order_id, v_id, amount)
+            )
+          
+          conn.commit()
+          return order_id
+      except Exception as e:
+        conn.rollback()
+        raise e
 
-    def add_order_item(self, item: OrderItem):
-        """add an item to an existing order (Order Modification)"""
-        conn = Database.get_connection()
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO order_items 
-                (order_id, product_id, quantity, price_at_purchase)
-                VALUES (%s, %s, %s, %s)
-            """, (item.order_id, item.product_id, item.quantity, item.price_at_purchase))
-            conn.commit()
+  def update_status(self, order_id, status):
+    sql = "UPDATE orders SET status = %s WHERE order_id = %s"
+    with self._get_connection() as conn:
+      with conn.cursor() as cursor:
+        cursor.execute(sql, (status, order_id))
+        conn.commit()
 
-    def remove_order_item(self, order_item_id: int):
-        """remove an item from an existing order (Order Modification)"""
-        conn = Database.get_connection()
-        with conn.cursor() as cursor:
-            cursor.execute("DELETE FROM order_items WHERE order_item_id = %s", (order_item_id,))
-            conn.commit()
-
-    def cancel_order(self, order_id: int):
-        """cancel an order (Order Cancellation) - only if it's still pending"""
-        self.update_status(order_id, OrderStatus.CANCELLED)
+  def get_order_details(self, order_id):
+    sql = "SELECT * FROM orders WHERE order_id = %s"
+    with self._get_connection() as conn:
+      with conn.cursor() as cursor:
+        cursor.execute(sql, (order_id,))
+        return cursor.fetchone()
+  
+  def get_order_items(self, order_id):
+    """Get all products in an order with their quantities and purchase prices."""
+    sql = "SELECT * FROM order_items WHERE order_id = %s"
+    with self._get_connection() as conn:
+      with conn.cursor() as cursor:
+        cursor.execute(sql, (order_id,))
+        return cursor.fetchall()
+      
+  def remove_item_by_id(self, order_item_id, order_id, new_total):
+        with self._get_connection() as conn:
+            conn.begin()
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM order_items WHERE order_item_id = %s", (order_item_id,))
+                    cursor.execute("UPDATE orders SET total_price = %s WHERE order_id = %s", (new_total, order_id))
+                    conn.commit()
+                    return True
+            except Exception as e:
+                conn.rollback()
+                raise e
